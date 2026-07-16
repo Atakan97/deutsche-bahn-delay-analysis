@@ -1,0 +1,45 @@
+
+# Local development dependencies
+
+# HTTP client & validation
+httpx==0.27.2          # async-capable HTTP client for calling v6.db.transport.rest
+pydantic==2.7.1        # data validation with Python type hints
+
+# Database
+psycopg2-binary==2.9.9 # PostgreSQL adapter
+sqlalchemy==2.0.30     # SQL toolkit used by the dashboard's db_connection utility
+
+# Data processing
+pandas==2.2.2
+numpy==1.26.4
+
+# Management
+prefect==3.0.0         # workflow management
+
+# dbt (transformation layer)
+dbt-core==1.8.3
+dbt-postgres==1.8.3    # dbt adapter for PostgreSQL
+
+# Machine learning
+scikit-learn==1.5.0    # baseline model + preprocessing utilities
+xgboost==2.0.3         # final gradient-boosting model
+mlflow==2.13.2         # experiment tracking (local file-based)
+shap==0.45.1           # model explainability (TreeExplainer for XGBoost)
+joblib==1.4.2          # model serialisation (save/load .pkl files)
+
+# API
+fastapi==0.111.0
+uvicorn==0.30.1        # ASGI server for running FastAPI locally
+
+# Dashboard
+streamlit==1.35.0
+plotly==5.22.0         # charts + scatter_mapbox
+
+# Utilities
+python-dotenv==1.0.1   # loads .env file into os.environ for local development
+matplotlib==3.9.0      # required by SHAP for saving summary plots
+
+# Dev tooling
+ruff==0.4.7            # linter / formatter (PEP 8)
+pytest==8.2.2          # unit testing
+pytest-httpx==0.30.0   # mocking httpx requests in tests
