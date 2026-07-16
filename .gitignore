@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+
+# ML artifacts
+ml/mlruns/
+ml/artifacts/
+
+# dbt
+transform/target/
+transform/dbt_packages/
+transform/logs/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff cache
+.ruff_cache/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker volumes (local dev)
+docker/postgres-data/
+
+# OS
+.DS_Store
+Thumbs.db

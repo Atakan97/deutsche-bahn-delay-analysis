@@ -1,0 +1,27 @@
+[project]
+name = "deutsche-bahn-delay-analysis"
+version = "0.1.0"
+description = "End-to-end data platform for Deutsche Bahn train delay analysis"
+requires-python = ">=3.11"
+
+# ---------------------------------------------------------------------------
+# Ruff — fast Python linter enforcing PEP 8 + import ordering
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+# E/W = pycodestyle errors/warnings, F = pyflakes, I = isort (import order)
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",  # line-too-long — handled by formatter, not linter
+]
+
+# ---------------------------------------------------------------------------
+# Pytest — test discovery configuration
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Show short test summary for failures only (-q) while still verbose on pass
+addopts = "-v"
