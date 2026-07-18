@@ -1,0 +1,27 @@
+# Main config file for the dbt transformation layer
+
+# Tells dbt where to find models, how to materialise them, and which
+# schemas to write to
+
+name: "deutsche_bahn_delay_analysis"
+version: "1.0.0"
+
+# The profile name must match an entry in profiles.yml
+profile: "deutsche_bahn_delay_analysis"
+
+# Where dbt looks for models, macros, etc.
+model-paths: ["models"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+# Model materialisation config
+# Staging models are views, marts models are tables
+models:
+  deutsche_bahn_delay_analysis:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts

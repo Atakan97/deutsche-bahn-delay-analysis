@@ -1,0 +1,84 @@
+# Data quality tests for the marts layer.
+
+version: 2
+
+models:
+  - name: dim_stations
+    description: >
+      Station dimension enriched with trip counts and category classification.
+      Contains one row per monitored station (10 total).
+
+    columns:
+      - name: station_id
+        description: "Primary key — DB HAFAS station identifier."
+        tests:
+          - not_null
+          - unique
+
+      - name: station_category
+        description: >
+          Classification based on trip volume: major_hub (>200 trips),
+          regional_hub (>50), or local_station (<=50).
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["major_hub", "regional_hub", "local_station"]
+
+  - name: dim_routes
+    description: >
+      Route dimension with one row per unique (line_name, train_type)
+      combination. Surrogate key route_id is a hash of these two fields.
+
+    columns:
+      - name: route_id
+        description: "Primary key: surrogate key from line_name + train_type."
+        tests:
+          - not_null
+          - unique
+
+  - name: fct_delays
+    description: >
+      Each row is one delay observation: a specific train
+      at a specific station for either departure or arrival. Incrementally
+      updated, only new data since the last run is processed.
+
+    columns:
+      - name: delay_id
+        description: "Primary key: surrogate key from trip_id + station_id + event_type."
+        tests:
+          - not_null
+          - unique
+
+      - name: delay_minutes
+        description: >
+          Delay in minutes. Negative means early, 0 means on time, positive
+          means late.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              # -5 min: trains can be slightly early (negative delay)
+              # 600 min: anything beyond this is almost certainly a data error
+              arguments:
+                min_value: -5
+                max_value: 600
+
+      - name: station_id
+        description: "Foreign key to dim_stations."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_stations')
+                field: station_id
+
+      - name: route_id
+        description: >
+          Foreign key to dim_routes. Can be NULL if the event had no line
+          information. The relationships test uses where to exclude nulls.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_routes')
+                field: route_id
+              config:
+                where: "route_id is not null"

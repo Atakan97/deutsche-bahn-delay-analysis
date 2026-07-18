@@ -1,0 +1,50 @@
+# Defines the raw schema tables as dbt sources
+# Tells dbt where to find the raw data that the Python pipeline writes
+
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: >
+      Raw data loaded by the Python ELT pipeline. These tables contain
+      unmodified API responses and reference data. dbt reads from these
+      tables but never writes to them.
+
+    tables:
+      - name: stations
+        description: >
+          Static reference data for the 10 monitored German train stations.
+          Seeded once by seed_stations.py. Contains station ID, name, and
+          geographic coordinates.
+        columns:
+          - name: station_id
+            description: "DB HAFAS station identifier (e.g. '8000105')"
+          - name: station_name
+            description: "Station name (e.g. 'Frankfurt(Main)Hbf')"
+          - name: latitude
+            description: "Station latitude (WGS84)"
+          - name: longitude
+            description: "Station longitude (WGS84)"
+
+      - name: train_events
+        description: >
+          Append-only log of departure and arrival events fetched every
+          15 minutes from the v6.db.transport.rest API. Each row contains
+          the full, unmodified API response as a JSONB blob in raw_data.
+        columns:
+          - name: id
+            description: "Auto-incrementing primary key (bigserial)"
+          - name: station_id
+            description: "FK to stations, which station this event was fetched from"
+          - name: event_type
+            description: "Either 'departure' or 'arrival'"
+          - name: raw_data
+            description: >
+              Full API response as JSONB. Contains tripId, when, plannedWhen,
+              delay (in seconds), line (with name and product), direction, etc.
+              Parsed by stg_train_events into typed columns.
+          - name: fetched_at
+            description: >
+              Timestamp when this row was inserted. Used by the incremental
+              fct_delays model to identify new data.

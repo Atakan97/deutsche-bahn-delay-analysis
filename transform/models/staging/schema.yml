@@ -1,0 +1,31 @@
+# Data quality tests for the staging layer
+# Tests run during `dbt test` and verify that the staging view produces
+# clean data from the raw JSONB parsing
+
+version: 2
+
+models:
+  - name: stg_train_events
+    description: >
+      Parsed and cleaned view of raw.train_events. Extracts typed columns
+      from the raw_data JSONB field. Filters out records with null trip_id.
+
+    columns:
+      - name: trip_id
+        description: >
+          Unique train journey identifier from the API (raw_data.tripId).
+          Not null because the WHERE clause filters out null trip_ids.
+        tests:
+          - not_null
+
+      - name: station_id
+        description: "Station where this event was observed."
+        tests:
+          - not_null
+
+      - name: delay_minutes
+        description: >
+          Delay in minutes.
+          Defaults to 0 when the API returns null delay.
+        tests:
+          - not_null
