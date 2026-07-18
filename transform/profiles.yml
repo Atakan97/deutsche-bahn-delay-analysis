@@ -1,0 +1,15 @@
+# dbt connection profile for Supabase PostgreSQL
+# Tells dbt how to connect to the database, connection details are read from environment variables
+
+deutsche_bahn_delay_analysis:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('SUPABASE_HOST') }}"
+      port: "{{ env_var('SUPABASE_PORT', '5432') | int }}"
+      user: "{{ env_var('SUPABASE_USER') }}"
+      password: "{{ env_var('SUPABASE_PASSWORD') }}"
+      dbname: "{{ env_var('SUPABASE_DB', 'postgres') }}"
+      schema: public
+      threads: 2
