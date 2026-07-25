@@ -18,7 +18,7 @@ prefect==3.0.0         # workflow management
 
 # dbt (transformation layer)
 dbt-core==1.8.3
-dbt-postgres==1.8.3    # dbt adapter for PostgreSQL
+dbt-postgres==1.8.2    # dbt adapter for PostgreSQL
 
 # Machine learning
 scikit-learn==1.5.0    # baseline model + preprocessing utilities
