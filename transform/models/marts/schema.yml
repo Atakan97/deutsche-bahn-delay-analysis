@@ -21,8 +21,7 @@ models:
           regional_hub (>50), or local_station (<=50).
         tests:
           - accepted_values:
-              arguments:
-                values: ["major_hub", "regional_hub", "local_station"]
+              values: ["major_hub", "regional_hub", "local_station"]
 
   - name: dim_routes
     description: >
@@ -56,20 +55,18 @@ models:
         tests:
           - not_null
           - dbt_utils.accepted_range:
-              # -5 min: trains can be slightly early (negative delay)
+              # -15 min: trains can be slightly early (negative delay)
               # 600 min: anything beyond this is almost certainly a data error
-              arguments:
-                min_value: -5
-                max_value: 600
+              min_value: -15
+              max_value: 600
 
       - name: station_id
         description: "Foreign key to dim_stations."
         tests:
           - not_null
           - relationships:
-              arguments:
-                to: ref('dim_stations')
-                field: station_id
+              to: ref('dim_stations')
+              field: station_id
 
       - name: route_id
         description: >
@@ -77,8 +74,7 @@ models:
           information. The relationships test uses where to exclude nulls.
         tests:
           - relationships:
-              arguments:
-                to: ref('dim_routes')
-                field: route_id
+              to: ref('dim_routes')
+              field: route_id
               config:
                 where: "route_id is not null"

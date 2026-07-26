@@ -2,7 +2,7 @@
 # Local development dependencies
 
 # HTTP client & validation
-httpx==0.27.2          # async-capable HTTP client for calling v6.db.transport.rest
+httpx==0.27.2          # async-capable HTTP client for calling DB APIs (StaDa & Timetables)
 pydantic==2.7.1        # data validation with Python type hints
 
 # Database

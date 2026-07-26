@@ -1,5 +1,5 @@
-# Runs the Prefect flow every 15 minutes to fetch departure/arrival data from the Deutsche Bahn API
-# and load it into the raw.train_events table in Supabase PostgreSQL
+# Runs the Prefect flow every 15 minutes to fetch departure/arrival data from the DB API
+# Load it into the raw.train_events table in Supabase PostgreSQL
 
 name: ETL Pipeline
 
@@ -36,4 +36,6 @@ jobs:
       - name: Run ELT pipeline
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DB_CLIENT_ID: ${{ secrets.DB_CLIENT_ID }}
+          DB_API_KEY: ${{ secrets.DB_API_KEY }}
         run: python -m data_pipeline.orchestration.flows
