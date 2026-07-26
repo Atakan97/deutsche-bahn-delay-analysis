@@ -2,19 +2,20 @@
 Prefect flow and task definitions for the pipeline
 This module defines the pipeline that runs every 15 minutes
 
-- Fetch departure and arrival data from the v6.db.transport.rest API 
-for each of the 10 monitored stations
+Fetch departure and arrival data from the official DB Timetables API
+for each of the 10 stations
 
 - Insert the raw JSON responses into raw.train_events table in PostgreSQL
 """
 
 import logging
 import os
+
 import psycopg2
 from dotenv import load_dotenv
 from prefect import flow, task
 
-from data_pipeline.extract.client import TransportApiClient
+from data_pipeline.extract.timetables import TimetablesClient
 from data_pipeline.load.db_writer import write_train_events
 
 logger = logging.getLogger(__name__)
@@ -29,21 +30,15 @@ EVENT_TYPES = ["departure", "arrival"]
     log_prints=True,
 )
 def fetch_station_events(
-    client: TransportApiClient,
+    client: TimetablesClient,
     station_id: str,
-    event_type: str,
-) -> list[dict]:
-    """Fetch departure or arrival events for a single station from the API
-    Extract step, the returned list contains raw JSON dicts as the API returned them
-    """
-    if event_type == "departure":
-        events = client.get_departures(station_id)
-    elif event_type == "arrival":
-        events = client.get_arrivals(station_id)
-    else:
-        raise ValueError(f"Unknown event_type: {event_type}")
-
-    print(f"  Fetched {len(events)} {event_type}s for station {station_id}")
+) -> dict[str, list[dict]]:
+    """Fetch both station boards in one Timetables API"""
+    events = client.get_station_events(station_id)
+    print(
+        f"  Fetched {len(events['departure'])} departures and "
+        f"{len(events['arrival'])} arrivals for station {station_id}"
+    )
     return events
 
 @task(
@@ -66,6 +61,7 @@ def load_events(
         events=events,
         station_id=station_id,
         event_type=event_type,
+        source="db-timetables-v1",
     )
     print(f"  Loaded {count} {event_type}s for station {station_id}")
     return count
@@ -76,8 +72,8 @@ def load_events(
 )
 def get_station_ids(database_url: str) -> list[str]:
     """Load the list of monitored station IDs from raw.stations
-    
-    The flow always uses stations are actually seeded, adding or removing stations 
+
+    The flow always uses stations are actually seeded, adding or removing stations
     only requires re-running seed_stations.py, not editing this flow code
     """
     conn = psycopg2.connect(database_url)
@@ -132,15 +128,16 @@ def etl_pipeline() -> None:
     total_loaded = 0
 
     # Use a single shared client for all API calls so the TCP connection is reused for requests
-    with TransportApiClient() as client:
+    client_id = os.environ.get("DB_CLIENT_ID")
+    api_key = os.environ.get("DB_API_KEY")
+    if not client_id or not api_key:
+        raise RuntimeError("DB_CLIENT_ID and DB_API_KEY must be set for the Timetables API.")
+
+    with TimetablesClient(client_id=client_id, api_key=api_key) as client:
         for station_id in station_ids:
+            station_events = fetch_station_events(client=client, station_id=station_id)
             for event_type in EVENT_TYPES:
-                # Extract, fetch events from the API
-                events = fetch_station_events(
-                    client=client,
-                    station_id=station_id,
-                    event_type=event_type,
-                )
+                events = station_events[event_type]
                 total_fetched += len(events)
 
                 # Load, insert raw JSON into PostgreSQL
@@ -161,6 +158,6 @@ def etl_pipeline() -> None:
     print(f"  Events fetched     : {total_fetched}")
     print(f"  Events loaded      : {total_loaded}")
     print("=" * 60)
-    
+
 if __name__ == "__main__":
     etl_pipeline()
