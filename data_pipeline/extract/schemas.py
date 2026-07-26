@@ -1,9 +1,12 @@
 """
-Pydantic models for v6.db.transport.rest API responses
-These models validate the JSON that comes back from the API before storing it in the database
+Pydantic models for the pipeline's train-event representation
+
+Timetables adapter converts DB's XML responses into this representation
+before the event is stored in ``raw.train_events``
 """
 
 from pydantic import BaseModel, Field
+
 
 class StationLocation(BaseModel):
     """Geographic coordinates of a station
@@ -12,9 +15,8 @@ class StationLocation(BaseModel):
     longitude: float
 
 class StationResponse(BaseModel):
-    """A single station returned by GET /locations?query={name}
-    """
-    # Only validate the fields we actually need
+    """Station payload used by consumers of this module"""
+    # Validate the needed fields
     id: str
     name: str
     location: StationLocation
