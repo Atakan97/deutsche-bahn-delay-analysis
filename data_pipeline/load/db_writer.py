@@ -1,10 +1,10 @@
 """
-Writes raw API data into the raw.train_events table
-Take raw JSON responses from the transport API and insert them into PostgreSQL without transformation
+Writes provider events into the raw.train_events table
 """
 
 import json
 import logging
+
 import psycopg2
 
 logger = logging.getLogger(__name__)
@@ -15,9 +15,10 @@ def write_train_events(
     events: list[dict],
     station_id: str,
     event_type: str,
+    source: str = "db-timetables-v1",
 ) -> int:
     """Insert a batch of raw API events into raw.train_events
-    Each event dict is stored in the raw_data JSONB column, without any transformation
+    Each event dict is stored in the raw_data JSONB column
     """
     # Validate event_type
     if event_type not in ("departure", "arrival"):
@@ -35,8 +36,8 @@ def write_train_events(
 
     # SQL for inserting a single event
     insert_sql = """
-        INSERT INTO raw.train_events (station_id, event_type, raw_data)
-        VALUES (%s, %s, %s);
+        INSERT INTO raw.train_events (station_id, event_type, raw_data, source)
+        VALUES (%s, %s, %s, %s);
     """
 
     inserted_count = 0
@@ -48,7 +49,7 @@ def write_train_events(
                 # Serialize the event dict to a JSON string for the JSONB column
                 raw_json = json.dumps(event, ensure_ascii=False)
 
-                cur.execute(insert_sql, (station_id, event_type, raw_json))
+                cur.execute(insert_sql, (station_id, event_type, raw_json, source))
                 inserted_count += 1
 
         # Commit all inserts in a single transaction
