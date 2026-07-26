@@ -1,0 +1,31 @@
+# Container image for the pipeline
+FROM python:3.11-slim
+
+# Install system packages needed by psycopg2 and dbt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install pipeline dependencies
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir \
+    httpx \
+    pydantic \
+    psycopg2-binary \
+    pandas \
+    prefect \
+    dbt-core \
+    dbt-postgres \
+    python-dotenv
+
+# Copy the application code
+COPY data_pipeline/ ./data_pipeline/
+COPY transform/ ./transform/
+
+# Copy dbt profiles, the pipeline container needs profiles.yml to connect
+COPY transform/profiles.yml ./transform/profiles.yml
+
+# Run the Prefect flow
+CMD ["python", "-m", "data_pipeline.orchestration.flows"]
