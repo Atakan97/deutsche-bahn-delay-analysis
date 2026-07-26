@@ -14,12 +14,11 @@ sources:
     tables:
       - name: stations
         description: >
-          Static reference data for the 10 monitored German train stations.
-          Seeded once by seed_stations.py. Contains station ID, name, and
-          geographic coordinates.
+          Official DB StaDa reference data for the 10 monitored German train
+          stations. Refreshed daily by seed_stations.py.
         columns:
           - name: station_id
-            description: "DB HAFAS station identifier (e.g. '8000105')"
+            description: "DB EVA station identifier (e.g. '8000105')"
           - name: station_name
             description: "Station name (e.g. 'Frankfurt(Main)Hbf')"
           - name: latitude
@@ -30,8 +29,8 @@ sources:
       - name: train_events
         description: >
           Append-only log of departure and arrival events fetched every
-          15 minutes from the v6.db.transport.rest API. Each row contains
-          the full, unmodified API response as a JSONB blob in raw_data.
+          15 minutes from the official DB Timetables API. The extractor
+          normalises its XML response into the project's JSON shape.
         columns:
           - name: id
             description: "Auto-incrementing primary key (bigserial)"
