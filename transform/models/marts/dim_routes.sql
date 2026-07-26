@@ -2,7 +2,7 @@
   Route dimension table
 
   Creates a unique list of train routes, identified by the combination of
-  line_name (e.g. "ICE 123") and train_type (e.g. "nationalExpress")
+  line_name (e.g. "ICE 123") and train_type (e.g. "ICE")
 */
 
 with distinct_routes as (

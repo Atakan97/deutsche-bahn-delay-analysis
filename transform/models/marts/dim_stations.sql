@@ -39,8 +39,8 @@ select
 
     -- Classify stations by volume
     case
-        when coalesce(tc.daily_trip_count, 0) > 200 then 'major_hub'
-        when coalesce(tc.daily_trip_count, 0) > 50  then 'regional_hub'
+        when coalesce(tc.daily_trip_count, 0) > 90  then 'major_hub'
+        when coalesce(tc.daily_trip_count, 0) > 40  then 'regional_hub'
         else 'local_station'
     end as station_category,
 
