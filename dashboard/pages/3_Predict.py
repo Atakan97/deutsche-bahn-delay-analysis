@@ -6,9 +6,19 @@ Delay prediction form
 - Displays the predicted delay with a visual metric card and context
 """
 
+import sys
+from pathlib import Path
+
 import streamlit as st
 
-from dashboard.utils.api_client import predict_delay
+root_dir = Path(__file__).resolve().parent.parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
+
+try:
+    from dashboard.utils.api_client import predict_delay
+except ModuleNotFoundError:
+    from utils.api_client import predict_delay
 
 st.set_page_config(page_title="Predict: DB Delays", page_icon="🔮", layout="wide")
 
