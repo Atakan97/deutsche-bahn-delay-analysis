@@ -9,7 +9,10 @@ Displays a Plotly scatter_mapbox showing the 10 monitored stations
 import plotly.express as px
 import streamlit as st
 
-from dashboard.utils.db_connection import run_query
+try:
+    from utils.db_connection import run_query
+except ModuleNotFoundError:
+    from dashboard.utils.db_connection import run_query
 
 st.set_page_config(page_title="Map: DB Delays", page_icon="🗺️", layout="wide")
 

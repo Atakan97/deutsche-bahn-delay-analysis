@@ -8,7 +8,10 @@ Delay prediction form
 
 import streamlit as st
 
-from dashboard.utils.api_client import predict_delay
+try:
+    from utils.api_client import predict_delay
+except ModuleNotFoundError:
+    from dashboard.utils.api_client import predict_delay
 
 st.set_page_config(page_title="Predict: DB Delays", page_icon="🔮", layout="wide")
 
@@ -102,7 +105,8 @@ with st.form("prediction_form"):
 # Process prediction
 if submitted:
     # Convert day name back to day_of_week integer
-    day_of_week = DAY_NAMES.index(day_name)
+    valid_day_name = day_name if day_name is not None else "Wednesday"
+    day_of_week = DAY_NAMES.index(valid_day_name)
     is_weekend = day_of_week in (0, 6)  # 0=Sunday, 6=Saturday
 
     features = {

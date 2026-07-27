@@ -5,7 +5,10 @@ KPIs, delay trends, and information
 import plotly.express as px
 import streamlit as st
 
-from dashboard.utils.db_connection import run_query
+try:
+    from utils.db_connection import run_query
+except ModuleNotFoundError:
+    from dashboard.utils.db_connection import run_query
 
 st.set_page_config(page_title="Overview: DB Delays", page_icon="📊", layout="wide")
 
