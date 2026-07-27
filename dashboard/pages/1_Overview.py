@@ -2,20 +2,10 @@
 KPIs, delay trends, and information
 """
 
-import sys
-from pathlib import Path
-
 import plotly.express as px
 import streamlit as st
 
-root_dir = Path(__file__).resolve().parent.parent.parent
-if str(root_dir) not in sys.path:
-    sys.path.insert(0, str(root_dir))
-
-try:
-    from dashboard.utils.db_connection import run_query
-except ModuleNotFoundError:
-    from utils.db_connection import run_query
+from dashboard.utils.db_connection import run_query
 
 st.set_page_config(page_title="Overview: DB Delays", page_icon="📊", layout="wide")
 
