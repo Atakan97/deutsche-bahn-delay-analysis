@@ -5,7 +5,7 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Live Demo:** [Streamlit Dashboard](https://share.streamlit.io) · [FastAPI Docs](https://huggingface.co/spaces)
+**Live Demo:** [Streamlit Dashboard](https://db-delay-analysis.streamlit.app/)
 
 ---
 
@@ -25,6 +25,20 @@
 | Interactive Map | Delay Prediction | Overview Dashboard |
 | :---: | :---: | :---: |
 | ![Interactive Map](docs/images/Map.png) | ![Delay Prediction](docs/images/Predict.png) | ![Overview Dashboard](docs/images/Overview.png) |
+
+---
+
+## ML Results
+
+- Model: XGBoost Regressor benchmarked against historical mean baseline
+- Features: `prev_delay`, `train_type`, `event_type`, `hour_of_day`, `station_category`, `day_of_week`, `is_weekend`
+- Explainability: SHAP TreeExplainer plot saved to `docs/images/shap_summary.png`
+- Experiment Check: MLflow logs saved to `ml/mlruns/` (`mlflow ui`)
+
+| Metric | Baseline | XGBoost | Improvement |
+|---|---|---|---|
+| **MAE** | 5.22 min | 4.14 min | **+20.8%** |
+| **RMSE** | 11.17 min | 9.30 min | **+16.7%** |
 
 ---
 
@@ -159,20 +173,6 @@ Secrets are managed with environment variables (`.env`):
 - `DB_CLIENT_ID` & `DB_API_KEY`: DB API Marketplace credentials (GitHub Actions)
 - `API_URL`: Deployed FastAPI URL (Streamlit Cloud)
 - `HF_SPACE_URL`: Deployed API endpoint (GitHub Actions keep-alive)
-
----
-
-## ML Results
-
-- Model: XGBoost Regressor benchmarked against historical mean baseline
-- Features: `prev_delay`, `train_type`, `event_type`, `hour_of_day`, `station_category`, `day_of_week`, `is_weekend`
-- Explainability: SHAP TreeExplainer plot saved to `docs/images/shap_summary.png`
-- Experiment Check: MLflow logs saved to `ml/mlruns/` (`mlflow ui`)
-
-| Metric | Baseline | XGBoost | Improvement |
-|---|---|---|---|
-| **MAE** | 5.22 min | 4.14 min | **+20.8%** |
-| **RMSE** | 11.17 min | 9.30 min | **+16.7%** |
 
 ---
 
