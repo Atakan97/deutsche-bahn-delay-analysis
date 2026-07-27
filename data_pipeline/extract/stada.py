@@ -95,7 +95,7 @@ class StadaClient:
         for name in names:
             search_term = OFFICIAL_STADA_NAMES.get(name, name)
             try:
-                payload = self._get_json("/stations", params=[("searchstring", search_term)])
+                payload = self._get_json("/stations", params={"searchstring": search_term})
                 results = payload.get("result", payload.get("results", []))
                 if isinstance(results, list) and results:
                     for item in results:
@@ -111,7 +111,10 @@ class StadaClient:
             if name not in resolved:
                 search_term_wc = f"*{_get_search_token(name)}*"
                 try:
-                    payload_wc = self._get_json("/stations", params=[("searchstring", search_term_wc), ("limit", "100")])
+                    payload_wc = self._get_json(
+                        "/stations",
+                        params={"searchstring": search_term_wc, "limit": "100"},
+                    )
                     results_wc = payload_wc.get("result", payload_wc.get("results", []))
                     if isinstance(results_wc, list):
                         for item in results_wc:
@@ -126,7 +129,7 @@ class StadaClient:
                 logger.error("StaDa did not return an exact match for %r.", name)
         return resolved
 
-    def _get_json(self, path: str, params: list[tuple[str, str]]) -> dict[str, Any]:
+    def _get_json(self, path: str, params: dict[str, str]) -> dict[str, Any]:
         last_error: Exception | None = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
