@@ -14,7 +14,7 @@
 - Automated pipeline: Prefect flow triggered every 15 minutes with GitHub Actions to fetch departures and arrivals for 10 German stations
 - dbt transformation layer: Staging views, incremental `fct_delays` fact table, `dim_stations` / `dim_routes` dimension tables with surrogate keys, data quality tests, and full documentation
 - XGBoost delay prediction: Feature engineering (7 features including `prev_delay`), RandomizedSearchCV hyperparameter tuning, MLflow experiment tracking, and SHAP explainability
-- FastAPI microservice: Deployed to Hugging Face Spaces (Docker). Validates requests with Pydantic, encodes categoricals with saved LabelEncoders, returns predictions
+- FastAPI microservice: Deployed to Render (Docker). Validates requests with Pydantic, encodes categoricals with saved LabelEncoders, returns predictions
 - Streamlit dashboard: Three pages: KPI Overview, Map, and a live prediction form that calls the FastAPI endpoint
 - CI/CD: GitHub Actions lints with `ruff` and runs unit tests on every push and pull request
 
@@ -47,7 +47,7 @@
 - Data & Pipeline: Python 3.11, Prefect, dbt, PostgreSQL (Supabase)
 - ML & Serving: XGBoost, scikit-learn, SHAP, MLflow, FastAPI, Docker
 - Dashboard: Streamlit
-- DevOps & Testing: GitHub Actions, Pytest, Ruff, Hugging Face Spaces
+- DevOps & Testing: GitHub Actions, Pytest, Ruff, Render
 
 ---
 
@@ -171,14 +171,13 @@ Secrets are managed with environment variables (`.env`):
 
 - `DATABASE_URL`: PostgreSQL connection string (GitHub Actions, Streamlit Cloud)
 - `DB_CLIENT_ID` & `DB_API_KEY`: DB API Marketplace credentials (GitHub Actions)
-- `API_URL`: Deployed FastAPI URL (Streamlit Cloud)
-- `HF_SPACE_URL`: Deployed API endpoint (GitHub Actions keep-alive)
+- `API_URL`: Deployed FastAPI URL (Streamlit Cloud, GitHub Actions keep-alive)
 
 ---
 
 ## Deployment
 
-- API: Deployed to Hugging Face Spaces and kept alive with GitHub Actions
+- API: Deployed to Render and kept alive with GitHub Actions
 - Dashboard: Hosted on Streamlit Community Cloud connected to Supabase PostgreSQL
 
 ---
@@ -188,7 +187,7 @@ Secrets are managed with environment variables (`.env`):
 - `ci.yml` — Linting & unit tests (on push/PR)
 - `etl_pipeline.yml` — Automated flow (every 15 min)
 - `station_catalog.yml` — Station data sync (daily)
-- `keep_alive.yml` — API uptime pings (every 6 hours)
+- `keep_alive.yml` — Uptime pings for Streamlit Cloud & Render API (every 14 min)
 
 ---
 ## License

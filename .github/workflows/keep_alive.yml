@@ -1,10 +1,10 @@
-# Prevents Hugging Face Spaces from sleeping
+# Prevents Streamlit Cloud and Render FastAPI backend from sleeping
 name: Keep Alive
 
 on:
   schedule:
-    # Every 6 hours at minute 0
-    - cron: "0 */6 * * *"
+    # Every 14 minutes
+    - cron: "*/14 * * * *"
 
   # Allow manual triggering for testing
   workflow_dispatch:
@@ -14,12 +14,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ping health endpoint
+      - name: Ping Streamlit Dashboard
         run: |
-          echo "Pinging ${{ secrets.HF_SPACE_URL }}/health ..."
-          curl -sf "${{ secrets.HF_SPACE_URL }}/health" \
+          echo "Pinging Streamlit Dashboard (https://db-delay-analysis.streamlit.app/) ..."
+          curl -sf "https://db-delay-analysis.streamlit.app/" \
             --max-time 30 \
             --retry 3 \
             --retry-delay 10 \
-            || echo "Warning: Health check failed (container may be cold-starting)."
-          echo "Done."
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GitHubActions-KeepAlive" \
+            || echo "Warning: Streamlit ping failed."
+          echo "Streamlit ping completed."
+
+      - name: Ping Render FastAPI endpoint
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          if [ -n "$API_URL" ]; then
+            CLEAN_URL="${API_URL%/}"
+            echo "Pinging API health endpoint at $CLEAN_URL/health ..."
+            curl -sf "$CLEAN_URL/health" \
+              --max-time 30 \
+              --retry 3 \
+              --retry-delay 10 \
+              || echo "Warning: API health check failed (container may be cold-starting)."
+            echo "API ping completed."
+          else
+            echo "No API_URL secret found in GitHub Secrets."
+          fi
+
