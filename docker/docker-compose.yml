@@ -38,7 +38,7 @@ services:
       context: ..
       dockerfile: api/Dockerfile
     ports:
-      - "7860:7860"
+      - "8000:8000"
     restart: unless-stopped
 
 volumes:

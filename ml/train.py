@@ -131,7 +131,7 @@ def save_model_artifact(
     joblib.dump(artifact, artifact_path)
     print(f"\nModel artifact saved to: {artifact_path}")
 
-    # Copy to api/model.pkl for deployment to Hugging Face Spaces
+    # Copy to api/model.pkl for API deployment (FastAPI / Render)
     API_DIR.mkdir(parents=True, exist_ok=True)
     api_model_path = API_DIR / "model.pkl"
     shutil.copy2(artifact_path, api_model_path)
