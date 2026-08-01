@@ -5,11 +5,14 @@ This module defines the pipeline that runs every 15 minutes
 Fetch departure and arrival data from the official DB Timetables API
 for each of the 10 stations
 
-- Insert the raw JSON responses into raw.train_events table in PostgreSQL
+Insert the raw JSON responses into raw.train_events table in PostgreSQL
 """
 
 import logging
 import os
+import subprocess
+from pathlib import Path
+from urllib.parse import urlparse
 
 import psycopg2
 from dotenv import load_dotenv
@@ -96,15 +99,56 @@ def get_station_ids(database_url: str) -> list[str]:
     print(f"Loaded {len(station_ids)} station IDs from raw.stations.")
     return station_ids
 
+
+@task(
+    name="run_dbt_transformations",
+    retries=1,
+    retry_delay_seconds=5,
+    log_prints=True,
+)
+def run_dbt_transformations() -> None:
+    """Run dbt transformations to populate staging and marts tables"""
+    transform_dir = Path(__file__).resolve().parent.parent.parent / "transform"
+
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url and not os.environ.get("SUPABASE_HOST"):
+        parsed = urlparse(db_url)
+        if parsed.hostname:
+            os.environ["SUPABASE_HOST"] = parsed.hostname
+        if parsed.port:
+            os.environ["SUPABASE_PORT"] = str(parsed.port)
+        if parsed.username:
+            os.environ["SUPABASE_USER"] = parsed.username
+        if parsed.password:
+            os.environ["SUPABASE_PASSWORD"] = parsed.password
+        if parsed.path:
+            os.environ["SUPABASE_DB"] = parsed.path.lstrip("/")
+
+    print("Running dbt transformations (dbt run)...")
+    result = subprocess.run(
+        ["dbt", "run", "--profiles-dir", "."],
+        cwd=transform_dir,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"dbt run failed:\n{result.stderr}")
+        raise RuntimeError(
+            f"dbt run failed with return code {result.returncode}:\n{result.stderr}\n{result.stdout}"
+        )
+
+    print("dbt transformations completed successfully.")
+
+
 @flow(
     name="deutsche-bahn-elt-pipeline",
     log_prints=True,
 )
 def elt_pipeline() -> None:
-    """Main pipeline flow: Extract raw data from the API, Load into PostgreSQL
+    """Extract raw data from the API, load into PostgreSQL,
+    and transform with dbt into staging and marts models
 
-    This flow is designed to run every 15 minutes with a GitHub Actions cron
-    job, each run typically takes 30–60 seconds depending on API response times
+    Designed to run every 15 minutes with a GitHub Actions
     """
     # Load .env for local development
     load_dotenv()
@@ -123,11 +167,10 @@ def elt_pipeline() -> None:
     # Get the list of stations to monitor
     station_ids = get_station_ids(database_url)
 
-    # Fetch and load events for each station × event type
     total_fetched = 0
     total_loaded = 0
 
-    # Use a single shared client for all API calls so the TCP connection is reused for requests
+    # Use a single client for all API calls so the TCP connection is reused
     client_id = os.environ.get("DB_CLIENT_ID")
     api_key = os.environ.get("DB_API_KEY")
     if not client_id or not api_key:
@@ -150,7 +193,9 @@ def elt_pipeline() -> None:
                     )
                     total_loaded += count
 
-    # Log summary
+    # Run dbt transformations
+    run_dbt_transformations()
+
     print("")
     print("=" * 60)
     print("Pipeline complete.")
