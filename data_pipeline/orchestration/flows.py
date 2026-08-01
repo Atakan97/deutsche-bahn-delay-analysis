@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 import psycopg2
 from dotenv import load_dotenv
 from prefect import flow, task
+from prefect.cache_policies import NO_CACHE
 
 from data_pipeline.extract.timetables import TimetablesClient
 from data_pipeline.load.db_writer import write_train_events
@@ -28,6 +29,7 @@ EVENT_TYPES = ["departure", "arrival"]
 
 @task(
     name="fetch_station_events",
+    cache_policy=NO_CACHE,
     retries=2,
     retry_delay_seconds=5,
     log_prints=True,
