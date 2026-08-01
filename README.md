@@ -185,7 +185,7 @@ Secrets are managed with environment variables (`.env`):
 ## CI/CD
 
 - `ci.yml` — Linting & unit tests (on push/PR)
-- `etl_pipeline.yml` — Automated flow (every 15 min)
+- `elt_pipeline.yml` — Automated flow (every 15 min)
 - `station_catalog.yml` — Station data sync (daily)
 - `keep_alive.yml` — Uptime pings for Streamlit Cloud & Render API (every 14 min)
 

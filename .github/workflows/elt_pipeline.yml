@@ -1,7 +1,7 @@
 # Runs the Prefect flow every 15 minutes to fetch departure/arrival data from the DB API
 # Load it into the raw.train_events table in Supabase PostgreSQL
 
-name: ETL Pipeline
+name: ELT Pipeline
 
 on:
   # Run every 15 minutes
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-etl:
+  run-elt:
     runs-on: ubuntu-latest
 
     steps:
@@ -38,4 +38,6 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DB_CLIENT_ID: ${{ secrets.DB_CLIENT_ID }}
           DB_API_KEY: ${{ secrets.DB_API_KEY }}
+          PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS: "60"
+          PREFECT_HOME: "/tmp/prefect"
         run: python -m data_pipeline.orchestration.flows

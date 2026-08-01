@@ -97,10 +97,10 @@ def get_station_ids(database_url: str) -> list[str]:
     return station_ids
 
 @flow(
-    name="deutsche-bahn-etl-pipeline",
+    name="deutsche-bahn-elt-pipeline",
     log_prints=True,
 )
-def etl_pipeline() -> None:
+def elt_pipeline() -> None:
     """Main pipeline flow: Extract raw data from the API, Load into PostgreSQL
 
     This flow is designed to run every 15 minutes with a GitHub Actions cron
@@ -160,4 +160,4 @@ def etl_pipeline() -> None:
     print("=" * 60)
 
 if __name__ == "__main__":
-    etl_pipeline()
+    elt_pipeline()
