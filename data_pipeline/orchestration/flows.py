@@ -107,7 +107,7 @@ def get_station_ids(database_url: str) -> list[str]:
     log_prints=True,
 )
 def run_dbt_transformations() -> None:
-    """Run dbt transformations to populate staging and marts tables"""
+    """Run dbt transformations for staging and marts tables"""
     transform_dir = Path(__file__).resolve().parent.parent.parent / "transform"
 
     db_url = os.environ.get("DATABASE_URL")
@@ -123,6 +123,19 @@ def run_dbt_transformations() -> None:
             os.environ["SUPABASE_PASSWORD"] = parsed.password
         if parsed.path:
             os.environ["SUPABASE_DB"] = parsed.path.lstrip("/")
+
+    print("Installing dbt package dependencies (dbt deps)...")
+    deps_result = subprocess.run(
+        ["dbt", "deps", "--profiles-dir", "."],
+        cwd=transform_dir,
+        capture_output=True,
+        text=True,
+    )
+    if deps_result.returncode != 0:
+        print(f"dbt deps failed:\n{deps_result.stderr}")
+        raise RuntimeError(
+            f"dbt deps failed with return code {deps_result.returncode}:\n{deps_result.stderr}\n{deps_result.stdout}"
+        )
 
     print("Running dbt transformations (dbt run)...")
     result = subprocess.run(
