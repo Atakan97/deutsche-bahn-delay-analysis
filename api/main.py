@@ -8,7 +8,7 @@ Serves the trained XGBoost model with two HTTP endpoints:
     and returns a predicted delay in minutes
 
   GET /health
-    Returns {"status": "healthy"} to confirm the service is running. 
+    Returns {"status": "healthy"} to confirm the service is running.
 """
 
 from contextlib import asynccontextmanager

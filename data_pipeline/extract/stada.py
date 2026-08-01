@@ -106,7 +106,7 @@ class StadaClient:
             except Exception as e:
                 logger.warning("Exact search for %r failed: %s", search_term, e)
 
-            # If the exact search fails, use a wildcard search (e.g. *Berlin*) 
+            # If the exact search fails, use a wildcard search (e.g. *Berlin*)
             # to match name variations like "Berlin Hbf" and "Berlin Hauptbahnhof"
             if name not in resolved:
                 search_term_wc = f"*{_get_search_token(name)}*"

@@ -3,6 +3,7 @@ HTTP client for the FastAPI prediction endpoint
 """
 
 import os
+
 import httpx
 import streamlit as st
 from dotenv import load_dotenv

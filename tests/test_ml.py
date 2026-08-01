@@ -9,6 +9,7 @@ import pytest
 from ml.evaluate import compare_models, compute_metrics
 from ml.features import FEATURE_COLUMNS, engineer_features
 
+
 # Test fixtures
 @pytest.fixture()
 def sample_feature_df() -> pd.DataFrame:
@@ -78,8 +79,8 @@ def sample_df_with_nulls() -> pd.DataFrame:
                 ["2025-07-16 08:00", "2025-07-16 08:30"]
             ),
             # Null values
-            "station_category": ["major_hub", None],  
-            "train_type": [None, "regional"], 
+            "station_category": ["major_hub", None],
+            "train_type": [None, "regional"],
         }
     )
 
@@ -145,7 +146,7 @@ class TestEngineerFeatures:
         """prev_delay for the second event of a trip should equal the first event's delay"""
         X, _, _ = engineer_features(sample_feature_df)
 
-        # First event: delay=5, prev_delay=0 
+        # First event: delay=5, prev_delay=0
         # Second event: delay=10, prev_delay=5
         # Check that at least one prev_delay equals 5.0
         assert 5.0 in X["prev_delay"].values
