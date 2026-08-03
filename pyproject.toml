@@ -4,15 +4,11 @@ version = "0.1.0"
 description = "End-to-end data platform for Deutsche Bahn train delay analysis"
 requires-python = ">=3.11"
 
-# ---------------------------------------------------------------------------
-# Pyright / Pylance — import resolution configuration
-# ---------------------------------------------------------------------------
+# Pyright / Pylance
 [tool.pyright]
 extraPaths = ["dashboard"]
 
-# ---------------------------------------------------------------------------
-# Ruff — fast Python linter enforcing PEP 8 + import ordering
-# ---------------------------------------------------------------------------
+# Ruff
 [tool.ruff]
 line-length = 88
 target-version = "py311"
@@ -21,13 +17,10 @@ target-version = "py311"
 # E/W = pycodestyle errors/warnings, F = pyflakes, I = isort (import order)
 select = ["E", "F", "W", "I"]
 ignore = [
-    "E501",  # line-too-long — handled by formatter, not linter
+    "E501",
 ]
 
-# ---------------------------------------------------------------------------
-# Pytest — test discovery configuration
-# ---------------------------------------------------------------------------
+# Pytest
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Show short test summary for failures only (-q) while still verbose on pass
 addopts = "-v"
