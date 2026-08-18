@@ -1,14 +1,12 @@
 /*
   Station dimension table
 
-  Support the static raw.stations reference data with derived metrics:
-    - daily_trip_count: how many distinct trips have been observed at this station
-    - station_category: a simple classification based on volume
+  Add recent trip volume and a category to the station data
 
   The station_category classification:
-    - major_hub : stations with > 200 distinct trips (e.g. Frankfurt, München)
-    - regional_hub : stations with > 50 distinct trips (e.g. Passau)
-    - local_station : stations with <= 50 distinct trips
+    - major_hub: median daily trips > 200
+    - regional_hub: median daily trips > 50
+    - local_station: median daily trips <= 50
 */
 
 with stations as (
@@ -20,12 +18,45 @@ with stations as (
     from {{ source('raw', 'stations') }}
 ),
 
--- Count distinct trips per station for all fetched events
-trip_counts as (
+date_range as (
+    select
+        (now() at time zone 'Europe/Berlin')::date - 7 as start_date,
+        (now() at time zone 'Europe/Berlin')::date as end_date
+),
+
+-- Count trips for each station and day
+daily_trip_counts as (
     select
         station_id,
-        count(distinct trip_id) as daily_trip_count
+        (planned_time at time zone 'Europe/Berlin')::date as service_date,
+        count(distinct trip_id) as trip_count
     from {{ ref('stg_train_events') }}
+    where planned_time is not null
+    group by
+        station_id,
+        (planned_time at time zone 'Europe/Berlin')::date
+),
+
+-- Use the last 7 complete days
+recent_trip_counts as (
+    select
+        daily.station_id,
+        daily.service_date,
+        daily.trip_count
+    from daily_trip_counts daily
+    cross join date_range dates
+    where daily.service_date >= dates.start_date
+      and daily.service_date < dates.end_date
+),
+
+-- Find the typical daily trip count
+station_volume as (
+    select
+        station_id,
+        percentile_cont(0.5) within group (order by trip_count)
+            as median_daily_trip_count,
+        count(*) as classification_days
+    from recent_trip_counts
     group by station_id
 )
 
@@ -35,17 +66,22 @@ select
     s.latitude,
     s.longitude,
 
-    coalesce(tc.daily_trip_count, 0) as daily_trip_count,
+    coalesce(
+        round(volume.median_daily_trip_count::numeric, 1),
+        0
+    ) as median_daily_trip_count,
+    coalesce(volume.classification_days, 0) as classification_days,
 
     -- Classify stations by volume
     case
-        when coalesce(tc.daily_trip_count, 0) > 90  then 'major_hub'
-        when coalesce(tc.daily_trip_count, 0) > 40  then 'regional_hub'
+        when coalesce(volume.median_daily_trip_count, 0) > 200 then 'major_hub'
+        when coalesce(volume.median_daily_trip_count, 0) > 50
+            then 'regional_hub'
         else 'local_station'
     end as station_category,
 
     now() as updated_at
 
 from stations s
-left join trip_counts tc
-    on s.station_id = tc.station_id
+left join station_volume volume
+    on s.station_id = volume.station_id

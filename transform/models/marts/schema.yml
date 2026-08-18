@@ -5,8 +5,9 @@ version: 2
 models:
   - name: dim_stations
     description: >
-      Station dimension enriched with trip counts and category classification.
-      Contains one row per monitored station (10 total).
+      Station dimension enriched with the median daily trip count from the
+      last 7 complete days and a category based on that value. Contains one
+      row per monitored station (10 total).
 
     columns:
       - name: station_id
@@ -17,11 +18,29 @@ models:
 
       - name: station_category
         description: >
-          Classification based on trip volume: major_hub (>200 trips),
-          regional_hub (>50), or local_station (<=50).
+          Classification based on the median daily trip count: major_hub
+          (>200 trips), regional_hub (>50), or local_station (<=50).
         tests:
+          - not_null
           - accepted_values:
               values: ["major_hub", "regional_hub", "local_station"]
+
+      - name: median_daily_trip_count
+        description: >
+          Median daily trip count from the last 7 complete days.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: classification_days
+        description: >
+          Number of days used to calculate the station category.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 7
 
   - name: dim_routes
     description: >
