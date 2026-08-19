@@ -9,9 +9,9 @@ Delay prediction form
 import streamlit as st
 
 try:
-    from utils.api_client import predict_delay
+    from utils.api_client import get_model_options, predict_delay
 except ModuleNotFoundError:
-    from dashboard.utils.api_client import predict_delay
+    from dashboard.utils.api_client import get_model_options, predict_delay
 
 st.set_page_config(page_title="Predict: DB Delays", page_icon="🔮", layout="wide")
 
@@ -21,9 +21,8 @@ st.markdown(
     "The model was trained on real Deutsche Bahn data collected every 15 minutes."
 )
 
-# Prediction form
-STATION_CATEGORIES = ["major_hub", "regional_hub", "local_station"]
-TRAIN_TYPES = [
+# Keep common train types at the top
+PREFERRED_TRAIN_TYPES = [
     "ICE",  # Intercity-Express
     "IC",   # Intercity / Eurocity
     "RE",   # Regional-Express
@@ -31,7 +30,11 @@ TRAIN_TYPES = [
     "S",    # S-Bahn
     "FLX",  # Flixtrain
 ]
-EVENT_TYPES = ["departure", "arrival"]
+STATION_CATEGORY_DESCRIPTIONS = {
+    "major_hub": "large central stations",
+    "regional_hub": "medium stations",
+    "local_station": "smaller stations",
+}
 DAY_NAMES = [
     "Sunday",     # 0
     "Monday",     # 1
@@ -41,6 +44,34 @@ DAY_NAMES = [
     "Friday",     # 5
     "Saturday",   # 6
 ]
+
+model_options = get_model_options()
+if model_options is None:
+    st.stop()
+
+station_categories = model_options.get("station_categories", [])
+model_train_types = model_options.get("train_types", [])
+event_types = model_options.get("event_types", [])
+
+train_types = [
+    train_type
+    for train_type in PREFERRED_TRAIN_TYPES
+    if train_type in model_train_types
+]
+
+if not station_categories or not train_types or not event_types:
+    st.error("The prediction model has no supported options.")
+    st.stop()
+
+default_station_index = (
+    station_categories.index("major_hub")
+    if "major_hub" in station_categories
+    else 0
+)
+station_category_help = ", ".join(
+    f"{category} = {STATION_CATEGORY_DESCRIPTIONS.get(category, 'supported station type')}"
+    for category in station_categories
+)
 
 with st.form("prediction_form"):
     st.subheader("Journey Details")
@@ -65,17 +96,13 @@ with st.form("prediction_form"):
     with col2:
         station_category = st.selectbox(
             "Station category",
-            options=STATION_CATEGORIES,
-            index=0,  # major_hub
-            help=(
-                "major_hub = large central stations, "
-                "regional_hub = medium stations, "
-                "local_station = smaller stations"
-            ),
+            options=station_categories,
+            index=default_station_index,
+            help=station_category_help,
         )
         train_type = st.selectbox(
             "Train type",
-            options=TRAIN_TYPES,
+            options=train_types,
             index=0,  # ICE
             help=(
                 "ICE = Intercity-Express, IC = Intercity/Eurocity, "
@@ -87,7 +114,7 @@ with st.form("prediction_form"):
     with col3:
         event_type = st.selectbox(
             "Event type",
-            options=EVENT_TYPES,
+            options=event_types,
             index=0,  # departure
             help="Whether this is a departure or arrival event",
         )

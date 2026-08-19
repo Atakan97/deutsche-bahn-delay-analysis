@@ -1,14 +1,5 @@
 """
 FastAPI application for train delay predictions
-
-Serves the trained XGBoost model with two HTTP endpoints:
-
-  POST /predict
-    Accepts train journey features (hour, day, station type, train type, etc.)
-    and returns a predicted delay in minutes
-
-  GET /health
-    Returns {"status": "healthy"} to confirm the service is running.
 """
 
 from contextlib import asynccontextmanager
@@ -20,14 +11,13 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-# Model loading, happens once at application startup
+# Model loading
 MODEL_PATH = Path(__file__).resolve().parent / "model.pkl"
 _artifact: dict | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the model artifact at startup, release at shutdown
-    """
+
     global _artifact  # noqa: PLW0603
 
     if not MODEL_PATH.exists():
@@ -41,9 +31,8 @@ async def lifespan(app: FastAPI):
     print(f"  Model type: {type(_artifact['model']).__name__}")
     print(f"  Features: {_artifact['feature_columns']}")
 
-    yield  # Application is running and serving requests
+    yield
 
-    # Cleanup
     _artifact = None
     print("Model unloaded.")
 
@@ -61,11 +50,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Request / Response models
+# Input features for a delay prediction
 class PredictionRequest(BaseModel):
-    """Input features for a delay prediction
-    """
-
     hour_of_day: int = Field(
         ...,
         ge=0,
@@ -115,27 +101,30 @@ class PredictionRequest(BaseModel):
         examples=[3.5],
     )
 
+# Prediction result
 class PredictionResponse(BaseModel):
-    """Prediction result returned by the /predict endpoint"""
-
     predicted_delay_minutes: float = Field(
         ...,
         description="Predicted delay in minutes. Negative means early.",
         examples=[4.2],
     )
 
-
+# Health check
 class HealthResponse(BaseModel):
-    """Health check response"""
-
     status: str = Field(
         ...,
         description="Service health status.",
         examples=["healthy"],
     )
 
+# Model options
+class ModelOptionsResponse(BaseModel):
+    station_categories: list[str]
+    train_types: list[str]
+    event_types: list[str]
 
-# Endpoints
+
+
 @app.post(
     "/predict",
     response_model=PredictionResponse,
@@ -146,8 +135,6 @@ class HealthResponse(BaseModel):
     ),
 )
 async def predict(request: PredictionRequest) -> PredictionResponse:
-    """Run inference on the loaded XGBoost model
-    """
     if _artifact is None:
         raise HTTPException(
             status_code=503,
@@ -169,8 +156,6 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
         "prev_delay": request.prev_delay,
     }
 
-    # Encode each categorical column using the saved LabelEncoder
-    # If the value is unknown, return a clear error
     for col, le in label_encoders.items():
         value = raw_features[col]
         if value not in le.classes_:
@@ -183,10 +168,8 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
             )
         raw_features[col] = int(le.transform([value])[0])
 
-    # Build feature vector in the correct column order
     feature_vector = pd.DataFrame([raw_features], columns=feature_columns)
 
-    # Predict
     prediction = model.predict(feature_vector)
     predicted_delay = float(np.round(prediction[0], 2))
 
@@ -200,5 +183,26 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
     description="Returns service health status. Used by keep-alive cron and monitoring.",
 )
 async def health() -> HealthResponse:
-    """Simple health check, confirms the service is running and the model is loaded."""
     return HealthResponse(status="healthy")
+
+
+@app.get(
+    "/model-options",
+    response_model=ModelOptionsResponse,
+    summary="Get model options",
+    description="Returns the category values supported by the trained model.",
+)
+async def get_model_options() -> ModelOptionsResponse:
+    if _artifact is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model not loaded. The service is starting up.",
+        )
+
+    label_encoders = _artifact["label_encoders"]
+
+    return ModelOptionsResponse(
+        station_categories=label_encoders["station_category"].classes_.tolist(),
+        train_types=label_encoders["train_type"].classes_.tolist(),
+        event_types=label_encoders["event_type"].classes_.tolist(),
+    )
