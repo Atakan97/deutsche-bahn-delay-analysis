@@ -2,6 +2,9 @@
 KPIs, delay trends, and information
 """
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 import plotly.express as px
 import streamlit as st
 
@@ -15,34 +18,70 @@ st.set_page_config(page_title="Overview: DB Delays", page_icon="📊", layout="w
 st.title("Delay Overview")
 st.markdown("Real-time delay analytics for 10 major German railway stations.")
 
-# KPI Cards
-kpi_query = """
+# Daily KPI data
+daily_kpi_query = """
     SELECT
+        (fetched_at AT TIME ZONE 'Europe/Berlin')::date                AS event_date,
         COUNT(*)                                                        AS total_events,
-        ROUND(AVG(delay_minutes)::numeric, 1)                          AS avg_delay,
+        ROUND(AVG(delay_minutes)::numeric, 1)                           AS avg_delay,
         ROUND(
             COUNT(CASE WHEN delay_minutes <= 0 THEN 1 END)::numeric
             / NULLIF(COUNT(*), 0)::numeric * 100, 1
-        )                                                               AS on_time_pct,
-        COUNT(DISTINCT station_id)                                      AS stations
+        )                                                               AS on_time_pct
+    FROM marts.fct_delays
+    GROUP BY event_date
+    ORDER BY event_date
+"""
+
+station_count_query = """
+    SELECT COUNT(DISTINCT station_id) AS stations
     FROM marts.fct_delays
 """
 
 try:
-    kpi = run_query(kpi_query)
+    daily_kpis = run_query(daily_kpi_query)
+    station_count = run_query(station_count_query)
 
-    if kpi.empty or kpi["total_events"].iloc[0] == 0:
+    if daily_kpis.empty:
         st.warning(
             "No data found in marts.fct_delays. "
             "Run the ELT pipeline and dbt to populate the tables first."
         )
         st.stop()
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Events", f"{kpi['total_events'].iloc[0]:,}")
-    c2.metric("Avg Delay", f"{kpi['avg_delay'].iloc[0]} min")
-    c3.metric("On-Time Rate", f"{kpi['on_time_pct'].iloc[0]}%")
-    c4.metric("Stations Monitored", int(kpi["stations"].iloc[0]))
+    berlin_today = datetime.now(ZoneInfo("Europe/Berlin")).date()
+    earliest_date = daily_kpis["event_date"].min()
+
+    date_column, _ = st.columns([1, 3])
+    selected_date = date_column.date_input(
+        "Event Date",
+        value=berlin_today,
+        min_value=earliest_date,
+        max_value=berlin_today,
+        format="DD.MM.YYYY",
+    )
+
+    selected_kpi = daily_kpis[daily_kpis["event_date"] == selected_date]
+    daily_kpi_area, station_kpi_area = st.columns([3, 1])
+
+    with daily_kpi_area:
+        if selected_kpi.empty:
+            st.warning("No event data is available for the selected date.")
+        else:
+            selected_values = selected_kpi.iloc[0]
+            event_column, delay_column, on_time_column = st.columns(3)
+            event_column.metric(
+                "Daily Events", f"{int(selected_values['total_events']):,}"
+            )
+            delay_column.metric(
+                "Avg Delay", f"{float(selected_values['avg_delay']):.1f} min"
+            )
+            on_time_column.metric(
+                "On-Time Rate", f"{float(selected_values['on_time_pct']):.1f}%"
+            )
+
+    with station_kpi_area:
+        st.metric("Stations Monitored", int(station_count["stations"].iloc[0]))
 
 except Exception as e:
     st.error(f"Could not load KPIs: {e}")
