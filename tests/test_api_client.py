@@ -5,6 +5,7 @@ import pytest
 
 from dashboard.utils import api_client
 
+
 # The client should return model options from the API
 def test_request_model_options_returns_response_data(
     monkeypatch: pytest.MonkeyPatch,
