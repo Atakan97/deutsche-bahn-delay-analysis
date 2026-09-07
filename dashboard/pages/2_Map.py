@@ -1,7 +1,7 @@
 """
 Interactive map of delay density for Germany
 
-Displays a Plotly scatter_mapbox showing the 10 monitored stations
+Displays a Plotly scatter_map showing the 10 monitored stations
 - Size: average delay (bigger = more delay)
 - Color: average delay (red = high delay, green = low delay)
 """
@@ -51,7 +51,7 @@ try:
     stations["unique_trips"] = stations["unique_trips"].fillna(0).astype(int)
 
     # Map
-    fig = px.scatter_mapbox(
+    fig = px.scatter_map(
         stations,
         lat="latitude",
         lon="longitude",
@@ -76,7 +76,7 @@ try:
         },
         zoom=5,
         center={"lat": 51.1657, "lon": 10.4515},
-        mapbox_style="open-street-map",
+        map_style="open-street-map",
     )
     fig.update_layout(
         height=650,

@@ -33,7 +33,7 @@ uvicorn==0.30.1        # ASGI server for running FastAPI locally
 
 # Dashboard
 streamlit==1.35.0
-plotly==5.22.0         # charts + scatter_mapbox
+plotly==7.0.0          # charts + MapLibre-based scatter_map
 
 # Utilities
 python-dotenv==1.0.1   # loads .env file into os.environ for local development
