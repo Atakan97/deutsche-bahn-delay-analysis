@@ -28,12 +28,17 @@ sources:
 
       - name: train_events
         description: >
-          Append-only log of departure and arrival events fetched every
+          Idempotent raw store of departure and arrival events fetched every
           15 minutes from the official DB Timetables API. The extractor
-          normalises its XML response into the project's JSON shape.
+          normalises its XML response into the project's JSON shape and
+          refreshes an existing event when the same raw_id is observed again.
         columns:
           - name: id
             description: "Auto-incrementing primary key (bigserial)"
+          - name: raw_id
+            description: >
+              SHA-256 event key used by ON CONFLICT upserts.
+              Rows created before this field was introduced may be null.
           - name: station_id
             description: "FK to stations, which station this event was fetched from"
           - name: event_type
@@ -45,5 +50,5 @@ sources:
               Parsed by stg_train_events into typed columns.
           - name: fetched_at
             description: >
-              Timestamp when this row was inserted. Used by the incremental
-              fct_delays model to identify new data.
+              Timestamp when this row was inserted or last refreshed. Used by
+              the incremental fct_delays model to identify changed data.

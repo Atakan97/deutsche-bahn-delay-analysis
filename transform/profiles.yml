@@ -11,5 +11,6 @@ deutsche_bahn_delay_analysis:
       user: "{{ env_var('SUPABASE_USER') }}"
       password: "{{ env_var('SUPABASE_PASSWORD') }}"
       dbname: "{{ env_var('SUPABASE_DB', 'postgres') }}"
+      sslmode: "{{ env_var('SUPABASE_SSLMODE', 'require') }}"
       schema: public
       threads: 2

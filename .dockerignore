@@ -1,0 +1,12 @@
+.git
+.env
+.venv
+.pytest_cache
+.ruff_cache
+**/__pycache__
+**/*.pyc
+transform/dbt_packages
+transform/target
+transform/logs
+ml/mlruns
+airflow/logs

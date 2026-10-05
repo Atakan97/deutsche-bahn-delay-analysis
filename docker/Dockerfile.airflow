@@ -1,0 +1,11 @@
+# Airflow image with pipeline dependencies
+FROM apache/airflow:2.11.2-python3.11
+ENV PYTHONPATH=/opt/airflow
+COPY requirements-airflow.txt /tmp/requirements-airflow.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-airflow.txt \
+    && pip check
+COPY --chown=airflow:root dags/ /opt/airflow/dags/
+COPY --chown=airflow:root data_pipeline/ /opt/airflow/data_pipeline/
+COPY --chown=airflow:root transform/ /opt/airflow/transform/
+RUN dbt deps \
+    --project-dir /opt/airflow/transform

@@ -1,0 +1,89 @@
+# Docker Compose for Apache Airflow
+
+x-airflow-common: &airflow-common
+  image: db-delay-airflow:local
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile.airflow
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-metadata-db:5432/airflow
+    PIPELINE_SCHEDULE: ${PIPELINE_SCHEDULE:-*/15 * * * *}
+  volumes:
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    airflow-metadata-db:
+      condition: service_healthy
+
+services:
+  # Airflow metadata database
+  airflow-metadata-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - airflow-metadata-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Migrate the DB schema and create an admin user
+  airflow-init:
+    <<: *airflow-common
+    environment:
+      <<: *airflow-env
+      AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-admin}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?Set AIRFLOW_ADMIN_PASSWORD in .env}
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        airflow db migrate
+        airflow users create \
+          --username "$${AIRFLOW_ADMIN_USERNAME}" \
+          --password "$${AIRFLOW_ADMIN_PASSWORD}" \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com || \
+        airflow users reset-password \
+          --username "$${AIRFLOW_ADMIN_USERNAME}" \
+          --password "$${AIRFLOW_ADMIN_PASSWORD}"
+    restart: "no"
+
+  # Airflow web UI
+  airflow-webserver:
+    <<: *airflow-common
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    command: airflow webserver --port 8080
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  # Airflow scheduler
+  airflow-scheduler:
+    <<: *airflow-common
+    environment:
+      <<: *airflow-env
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      DB_CLIENT_ID: ${DB_CLIENT_ID:?Set DB_CLIENT_ID in .env}
+      DB_API_KEY: ${DB_API_KEY:?Set DB_API_KEY in .env}
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    command: airflow scheduler
+    restart: unless-stopped
+
+volumes:
+  airflow-metadata-db-data:
+  airflow-logs:

@@ -1,43 +1,72 @@
-# Runs the Prefect flow every 15 minutes to fetch departure/arrival data from the DB API
-# Load it into the raw.train_events table in Supabase PostgreSQL
-
-name: ELT Pipeline
+name: ELT Pipeline (Airflow)
 
 on:
-  # Run every 15 minutes
-  schedule:
-    - cron: "*/15 * * * *"
-
-  # Allow manual triggering from the Actions tab
   workflow_dispatch:
+  # Add a schedule after the first manual run succeeds
+  # schedule:
+  #   - cron: "7,22,37,52 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-elt-pipeline
+  cancel-in-progress: false
 
 jobs:
-  run-elt:
+  run-pipeline:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMPOSE_FILE: docker/docker-compose.airflow.ci.yml
+      COMPOSE_PROJECT_NAME: db-delay-elt
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DB_CLIENT_ID: ${{ secrets.DB_CLIENT_ID }}
+      DB_API_KEY: ${{ secrets.DB_API_KEY }}
 
     steps:
-      # Check out the repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up Python 3.11
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Check required secrets
+        run: |
+          for variable in DATABASE_URL DB_CLIENT_ID DB_API_KEY; do
+            if [ -z "${!variable}" ]; then
+              echo "Missing secret: $variable"
+              exit 1
+            fi
+          done
+
+      - name: Build Airflow image
+        run: docker compose build airflow-scheduler
+
+      - name: Start Airflow scheduler
+        run: docker compose up -d --wait --wait-timeout 180 airflow-scheduler
+
+      - name: Trigger the ELT DAG and wait for its result
+        run: |
+          docker compose exec -T airflow-scheduler \
+            python -m data_pipeline.orchestration.run_dag \
+            --run-id "github__${GITHUB_RUN_ID}__${GITHUB_RUN_ATTEMPT}" \
+            --timeout 600
+
+      - name: Collect Airflow logs
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/airflow-logs"
+          docker compose logs --no-color > "$RUNNER_TEMP/airflow-logs/services.log" 2>&1
+          if [ -n "$(docker compose ps -q airflow-scheduler)" ]; then
+            docker compose cp airflow-scheduler:/opt/airflow/logs "$RUNNER_TEMP/airflow-logs/tasks"
+          fi
+
+      - name: Upload Airflow logs
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          python-version: "3.11"
+          name: airflow-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/airflow-logs
+          retention-days: 7
 
-      # Install dependencies
-      - name: Install dependencies
-        run: pip install -r requirements-dev.txt
-
-      # Run the Prefect flow
-      # DATABASE_URL is the secret needed to connect Supabase PostgreSQL
-      # Flow reads station IDs from raw.stations and fetches/loads events
-      - name: Run ELT pipeline
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DB_CLIENT_ID: ${{ secrets.DB_CLIENT_ID }}
-          DB_API_KEY: ${{ secrets.DB_API_KEY }}
-          PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS: "60"
-          PREFECT_HOME: "/tmp/prefect"
-        run: python -m data_pipeline.orchestration.flows
+      - name: Stop Airflow and remove temporary volumes
+        if: always()
+        run: docker compose down --volumes --remove-orphans

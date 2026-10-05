@@ -2,16 +2,13 @@
 
 > A data engineering and machine learning pipeline that collects real-time train departure/arrival data from the official Deutsche Bahn Timetables API, transforms it through a dbt schema, trains an XGBoost delay prediction model, and serves predictions with a FastAPI microservice. All of them are visualised in a live Streamlit dashboard.
 
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
 **Live Demo:** [Streamlit Dashboard](https://db-delay-analysis.streamlit.app/)
 
 ---
 
 ## Features
 
-- Automated pipeline: Prefect flow triggered every 15 minutes with GitHub Actions to fetch departures and arrivals for 10 German stations
+- Airflow pipeline: Two tasks fetch train events for 10 German stations and run dbt. GitHub Actions starts a real Airflow scheduler for each cloud run. Local Docker also provides the Airflow web UI.
 - dbt transformation layer: Staging views, incremental `fct_delays` fact table, `dim_stations` / `dim_routes` dimension tables with surrogate keys, data quality tests, and full documentation
 - XGBoost delay prediction: Feature engineering (7 features including `prev_delay`), RandomizedSearchCV hyperparameter tuning, MLflow experiment tracking, and SHAP explainability
 - FastAPI microservice: Deployed to Render (Docker). Validates requests with Pydantic, encodes categoricals with saved LabelEncoders, returns predictions
@@ -44,10 +41,10 @@
 
 ## Tech Stack
 
-- Data & Pipeline: Python 3.11, Prefect, dbt, PostgreSQL (Supabase)
+- Data & Pipeline: Python 3.11, Apache Airflow, dbt, PostgreSQL (Supabase)
 - ML & Serving: XGBoost, scikit-learn, SHAP, MLflow, FastAPI, Docker
 - Dashboard: Streamlit
-- DevOps & Testing: GitHub Actions, Pytest, Ruff, Render
+- Cloud & DevOps: GitHub Actions, Docker Compose, Pytest, Ruff, Render
 
 ---
 
@@ -57,13 +54,22 @@
 
 ```
 DB StaDa (daily) → raw.stations
-DB Timetables (every 15 min) → Python Extract → raw.train_events (JSONB)
+DB Timetables → Airflow extract_and_load → raw.train_events (JSONB)
              → dbt Staging  → staging.stg_train_events
              → dbt Marts    → marts.fct_delays + dims
              → ML Training  → api/model.pkl (XGBoost + encoders)
              → FastAPI      → POST /predict
              → Streamlit    → Live dashboard
 ```
+
+The [Airflow DAG](data_pipeline/orchestration/flows.py) has two tasks:
+`extract_and_load → transform`. Airflow controls task order, two retries per
+task, and the final run state. Each Airflow environment allows one active DAG run. The transform task runs `dbt run`; `dbt test` is postponed.
+
+The [ELT workflow](.github/workflows/elt_pipeline.yml) first supports manual
+runs. After a successful cloud run, its 15-minute schedule can be enabled.
+Each run uses temporary Airflow services and saves task logs as a GitHub
+Actions artifact.
 
 ---
 
@@ -73,7 +79,7 @@ DB Timetables (every 15 min) → Python Extract → raw.train_events (JSONB)
 
 - Python 3.11+
 - PostgreSQL 15 (or a [Supabase](https://supabase.com) account)
-- Docker (for local)
+- Docker (for Airflow / local dev)
 
 ### 1. Clone the repository
 
@@ -85,8 +91,12 @@ cd deutsche-bahn-delay-analysis
 ### 2. Install dependencies
 
 ```bash
+# Install application, dbt, ML, API, dashboard, and test dependencies
 pip install -r requirements-dev.txt
+pip check
 ```
+
+Airflow deployment is Linux-based, on Windows use Docker Desktop or WSL2.
 
 ### 3. Configure environment
 
@@ -101,6 +111,8 @@ Required variables:
 - `DATABASE_URL`: PostgreSQL connection string (Supabase)
 - `API_URL`: FastAPI base URL (default: `http://localhost:8000`)
 - `DB_CLIENT_ID` & `DB_API_KEY`: DB API Marketplace credentials (for StaDa & Timetables)
+- `AIRFLOW_ADMIN_USERNAME` & `AIRFLOW_ADMIN_PASSWORD`: Local Airflow web UI credentials
+- `PIPELINE_SCHEDULE`: Local DAG cron, or `none` for manual runs
 
 ### 4. Set up the database
 
@@ -110,25 +122,35 @@ Required variables:
 python -m data_pipeline.extract.seed_stations
 
 # Install dbt packages
-cd transform && dbt deps
+dbt deps --project-dir transform
 ```
 
-### 5. Run the pipeline
+### 5. Run the pipeline with Airflow
 
 ```bash
-# Run the full pipeline once
-python -m data_pipeline.orchestration.flows
+# Start the Airflow stack
+docker compose --env-file .env -f docker/docker-compose.airflow.yml up --build -d
 
-# Or trigger it with GitHub Actions (runs every 15 minutes)
+# Access Airflow UI at http://localhost:8080
+# Sign in with AIRFLOW_ADMIN_USERNAME / AIRFLOW_ADMIN_PASSWORD from .env
+
+# View scheduler logs
+docker compose --env-file .env -f docker/docker-compose.airflow.yml logs -f airflow-scheduler
 ```
+
+Run these commands from the repository root. If cloud runs are active, set
+`PIPELINE_SCHEDULE=none` locally and avoid manual local runs against the same
+database at the same time.
 
 ### 6. Run dbt transformations
 
+Airflow already runs dbt after the extract task. For a manual dbt run, set the
+`SUPABASE_*` variables in your shell first:
+
 ```bash
-cd transform
-dbt run        # Build staging and mart models
-dbt test       # Run data quality tests
-dbt docs serve # Browse model documentation
+dbt run --project-dir transform --profiles-dir transform
+dbt docs generate --project-dir transform --profiles-dir transform
+dbt docs serve --project-dir transform --profiles-dir transform
 ```
 
 ### 7. Train the model
@@ -158,7 +180,7 @@ streamlit run dashboard/app.py
 # Open http://localhost:8501
 ```
 
-### Local with Docker Compose
+### Local with Docker Compose (DB + API only)
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build
@@ -169,14 +191,17 @@ docker compose -f docker/docker-compose.yml up --build
 
 Secrets are managed with environment variables (`.env`):
 
-- `DATABASE_URL`: PostgreSQL connection string (GitHub Actions, Streamlit Cloud)
-- `DB_CLIENT_ID` & `DB_API_KEY`: DB API Marketplace credentials (GitHub Actions)
+- `DATABASE_URL`: PostgreSQL connection string (Airflow, Streamlit Cloud)
+- `DB_CLIENT_ID` & `DB_API_KEY`: DB API Marketplace credentials (Airflow)
+- `AIRFLOW_ADMIN_USERNAME` & `AIRFLOW_ADMIN_PASSWORD`: Airflow Web UI credentials
+- `PIPELINE_SCHEDULE`: Local schedule, default `*/15 * * * *`. The cloud stack always uses `none`.
 - `API_URL`: Deployed FastAPI URL (Streamlit Cloud, GitHub Actions keep-alive)
 
 ---
 
 ## Deployment
 
+- Pipeline: Temporary Apache Airflow scheduler on a GitHub Actions runner. Manual activation comes first, a 15-minute cron can be enabled after validation.
 - API: Deployed to Render and kept alive with GitHub Actions
 - Dashboard: Hosted on Streamlit Community Cloud connected to Supabase PostgreSQL
 
@@ -184,10 +209,10 @@ Secrets are managed with environment variables (`.env`):
 
 ## CI/CD
 
-- `ci.yml` — Linting & unit tests (on push/PR)
-- `elt_pipeline.yml` — Automated flow (every 15 min)
-- `station_catalog.yml` — Station data sync (daily)
-- `keep_alive.yml` — Uptime pings for Streamlit Cloud & Render API (every 14 min)
+- `ci.yml`: Ruff, unit tests, DAG discovery, and real scheduler success/failure checks (on push/PR)
+- `elt_pipeline.yml`: Production Airflow DAG runs (manual first)
+- `station_catalog.yml`: Station data sync (daily)
+- `keep_alive.yml`: Uptime pings for Streamlit Cloud & Render API (every 14 min)
 
 ---
 ## License

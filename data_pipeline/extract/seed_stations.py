@@ -24,7 +24,7 @@ STATIONS_TO_SEED = [
 
 
 def get_db_connection(database_url: str) -> psycopg2.extensions.connection:
-    """Open and return a PostgreSQL connection."""
+    """Open and return a PostgreSQL connection"""
     return psycopg2.connect(database_url)
 
 
@@ -53,6 +53,7 @@ def create_raw_tables(conn: psycopg2.extensions.connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS raw.train_events (
             id BIGSERIAL PRIMARY KEY,
+            raw_id TEXT,
             station_id TEXT NOT NULL,
             event_type TEXT NOT NULL CHECK (event_type IN ('departure', 'arrival')),
             raw_data JSONB NOT NULL,
@@ -60,6 +61,9 @@ def create_raw_tables(conn: psycopg2.extensions.connection) -> None:
             source TEXT NOT NULL DEFAULT 'db-timetables-v1'
         );
         """,
+        # Existing rows remain untouched, all new writes receive a raw_id
+        "ALTER TABLE raw.train_events ADD COLUMN IF NOT EXISTS raw_id TEXT;",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_train_events_raw_id ON raw.train_events (raw_id);",
         "CREATE INDEX IF NOT EXISTS idx_train_events_fetched_at ON raw.train_events (fetched_at);",
         "CREATE INDEX IF NOT EXISTS idx_train_events_station_id ON raw.train_events (station_id);",
         "ALTER TABLE raw.train_events ALTER COLUMN source SET DEFAULT 'db-timetables-v1';",
@@ -71,7 +75,7 @@ def create_raw_tables(conn: psycopg2.extensions.connection) -> None:
 
 
 def upsert_station(conn: psycopg2.extensions.connection, station: Station) -> None:
-    """Refresh a station directly, retaining last known catalogue on failure"""
+    """Refresh a station directly and retain the last known catalogue on failure"""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -87,7 +91,7 @@ def upsert_station(conn: psycopg2.extensions.connection, station: Station) -> No
 
 
 def seed_stations(database_url: str, client_id: str, api_key: str) -> None:
-    """Atomically refresh all monitored stations using DB's StaDa API"""
+    """Refresh all monitored stations using DB's StaDa API"""
     conn = get_db_connection(database_url)
     try:
         print("[1/4] Creating schemas...")

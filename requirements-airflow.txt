@@ -1,0 +1,8 @@
+# Pipeline dependencies for the Airflow container
+apache-airflow==2.11.2
+httpx==0.28.1
+pydantic==2.12.5
+psycopg2-binary==2.9.11
+dbt-core==1.8.3
+dbt-postgres==1.8.2
+python-dotenv==1.2.2

@@ -20,6 +20,9 @@ ignore = [
     "E501",
 ]
 
+[tool.ruff.lint.isort]
+known-third-party = ["airflow"]
+
 # Pytest
 [tool.pytest.ini_options]
 testpaths = ["tests"]

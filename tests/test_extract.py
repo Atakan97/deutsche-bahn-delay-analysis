@@ -8,9 +8,10 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 
+from data_pipeline.extract.seed_stations import create_raw_tables
 from data_pipeline.extract.stada import StadaClient
 from data_pipeline.extract.timetables import TimetablesClient
-from data_pipeline.load.db_writer import write_train_events
+from data_pipeline.load.db_writer import build_raw_event_id, write_train_events
 
 
 def test_stada_resolves_main_eva_and_coordinates(httpx_mock) -> None:
@@ -97,6 +98,38 @@ def test_writer_records_the_official_source(mock_connect: MagicMock) -> None:
     )
 
     assert result == 1
-    _, params = cursor.execute.call_args.args
-    assert json.loads(params[2]) == {"tripId": "trip-123", "delay": 0}
-    assert params[3] == "db-timetables-v1"
+    sql, params = cursor.execute.call_args.args
+    assert "ON CONFLICT (raw_id) DO UPDATE" in sql
+    assert params[0] == build_raw_event_id(
+        {"tripId": "trip-123", "delay": 0},
+        "8011160",
+        "departure",
+        "db-timetables-v1",
+    )
+    assert json.loads(params[3]) == {"tripId": "trip-123", "delay": 0}
+    assert params[4] == "db-timetables-v1"
+
+
+def test_raw_event_id_is_stable_but_distinguishes_event_context() -> None:
+    event = {"tripId": "trip-123", "plannedWhen": "2026-07-19T12:00:00+02:00"}
+
+    first = build_raw_event_id(event, "8011160", "departure", "db-timetables-v1")
+    retry = build_raw_event_id(event, "8011160", "departure", "db-timetables-v1")
+    arrival = build_raw_event_id(event, "8011160", "arrival", "db-timetables-v1")
+
+    assert first == retry
+    assert first != arrival
+
+
+def test_raw_schema_adds_unique_event_identifier() -> None:
+    cursor = MagicMock()
+    connection = MagicMock()
+    connection.cursor.return_value.__enter__ = MagicMock(return_value=cursor)
+    connection.cursor.return_value.__exit__ = MagicMock(return_value=False)
+
+    create_raw_tables(connection)
+
+    statements = [call.args[0] for call in cursor.execute.call_args_list]
+    assert any("ADD COLUMN IF NOT EXISTS raw_id TEXT" in sql for sql in statements)
+    assert any("UNIQUE INDEX" in sql and "raw_id" in sql for sql in statements)
+    connection.commit.assert_called_once_with()

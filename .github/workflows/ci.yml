@@ -32,3 +32,56 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+
+  validate-airflow-dag:
+    name: Validate Airflow DAG and scheduler (Docker / Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COMPOSE_FILE: docker/docker-compose.airflow.ci.yml
+      COMPOSE_PROJECT_NAME: db-delay-airflow-ci
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Airflow image
+        run: docker compose build airflow-scheduler
+
+      - name: Validate DAG imports and runner behavior
+        run: |
+          docker run --rm --entrypoint bash \
+            -e AIRFLOW__CORE__LOAD_EXAMPLES=false \
+            -v "$PWD/tests:/opt/airflow/tests:ro" \
+            db-delay-airflow:ci -c \
+            "pip install --no-cache-dir pytest==8.2.2 && python -m pytest tests/test_airflow_dag.py tests/test_airflow_runner.py -v --tb=short"
+
+      - name: Start the real scheduler
+        run: |
+          docker compose up -d --wait --wait-timeout 180 airflow-scheduler
+          docker compose cp tests/dags/airflow_smoke_dag.py airflow-scheduler:/opt/airflow/dags/airflow_smoke_dag.py
+
+      - name: Check a successful DAG run
+        run: |
+          docker compose exec -T airflow-scheduler \
+            python -m data_pipeline.orchestration.run_dag \
+            --dag-id airflow-smoke-success --run-id ci-success --timeout 180
+
+      - name: Check a failed DAG run
+        run: |
+          if docker compose exec -T airflow-scheduler \
+            python -m data_pipeline.orchestration.run_dag \
+            --dag-id airflow-smoke-failure --run-id ci-failure --timeout 180; then
+            echo "The failure check must return a non-zero exit code."
+            exit 1
+          fi
+          docker compose exec -T airflow-scheduler python -c \
+            'from data_pipeline.orchestration.run_dag import get_run_state; assert get_run_state("airflow-smoke-failure", "ci-failure") == "failed"'
+
+      - name: Show Airflow logs after a failure
+        if: failure()
+        run: docker compose logs --no-color --tail 100
+
+      - name: Stop Airflow and remove temporary volumes
+        if: always()
+        run: docker compose down --volumes --remove-orphans

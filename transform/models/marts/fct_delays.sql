@@ -1,11 +1,11 @@
 /*
   Fact table for train delay events (INCREMENTAL)
 
-  The pipeline appends new rows to raw.train_events every 15 minutes,
-  without incremental processing
+  The pipeline inserts new events and refreshes previously observed events
+  in raw.train_events every 15 minutes
 
-  Each run processes only the events fetched in the last
-  15 minutes, not full dataset
+  Without incremental processing, every run would scan the complete raw dataset
+  Each run processes only the events fetched in the last 15 minutes
 */
 
 {{
@@ -20,7 +20,7 @@ with stg_events as (
     from {{ ref('stg_train_events') }}
 
     /*
-      Incremental filter: only process rows that arrived after the most recent
+      Incremental filter, only process rows that arrived after the most recent
       row that already processed
     */
     {% if is_incremental() %}
