@@ -58,8 +58,9 @@ jobs:
 
       - name: Start the real scheduler
         run: |
-          docker compose up -d --wait --wait-timeout 180 airflow-scheduler
+          docker compose create airflow-scheduler
           docker compose cp tests/dags/airflow_smoke_dag.py airflow-scheduler:/opt/airflow/dags/airflow_smoke_dag.py
+          docker compose up -d --wait --wait-timeout 180 airflow-scheduler
 
       - name: Check a successful DAG run
         run: |

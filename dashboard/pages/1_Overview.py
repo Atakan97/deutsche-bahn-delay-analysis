@@ -2,7 +2,7 @@
 KPIs, delay trends, and information
 """
 
-from datetime import datetime
+from datetime import date
 from zoneinfo import ZoneInfo
 
 import plotly.express as px
@@ -13,6 +13,11 @@ try:
 except ModuleNotFoundError:
     from dashboard.utils.db_connection import run_query
 
+
+def format_event_date(event_date: date) -> str:
+    return event_date.strftime("%d.%m.%Y")
+
+
 st.set_page_config(page_title="Overview: DB Delays", page_icon="📊", layout="wide")
 
 st.title("Delay Overview")
@@ -22,6 +27,7 @@ st.markdown("Real-time delay analytics for 10 major German railway stations.")
 daily_kpi_query = """
     SELECT
         (fetched_at AT TIME ZONE 'Europe/Berlin')::date                AS event_date,
+        MAX(fetched_at)                                              AS latest_fetched_at,
         COUNT(*)                                                        AS total_events,
         ROUND(AVG(delay_minutes)::numeric, 1)                           AS avg_delay,
         ROUND(
@@ -49,36 +55,35 @@ try:
         )
         st.stop()
 
-    berlin_today = datetime.now(ZoneInfo("Europe/Berlin")).date()
-    earliest_date = daily_kpis["event_date"].min()
+    available_dates = sorted(daily_kpis["event_date"].tolist(), reverse=True)
+    latest_data_time = daily_kpis["latest_fetched_at"].max()
+    latest_data_time = latest_data_time.astimezone(ZoneInfo("Europe/Berlin"))
+    st.caption(f"Latest data: {latest_data_time:%d.%m.%Y, %H:%M} (Berlin)")
 
     date_column, _ = st.columns([1, 3])
-    selected_date = date_column.date_input(
+    selected_date = date_column.selectbox(
         "Event Date",
-        value=berlin_today,
-        min_value=earliest_date,
-        max_value=berlin_today,
-        format="DD.MM.YYYY",
+        options=available_dates,
+        index=0,
+        format_func=format_event_date,
     )
+    date_column.caption("Only dates with recorded data are available.")
 
     selected_kpi = daily_kpis[daily_kpis["event_date"] == selected_date]
     daily_kpi_area, station_kpi_area = st.columns([3, 1])
 
     with daily_kpi_area:
-        if selected_kpi.empty:
-            st.warning("No event data is available for the selected date.")
-        else:
-            selected_values = selected_kpi.iloc[0]
-            event_column, delay_column, on_time_column = st.columns(3)
-            event_column.metric(
-                "Daily Events", f"{int(selected_values['total_events']):,}"
-            )
-            delay_column.metric(
-                "Avg Delay", f"{float(selected_values['avg_delay']):.1f} min"
-            )
-            on_time_column.metric(
-                "On-Time Rate", f"{float(selected_values['on_time_pct']):.1f}%"
-            )
+        selected_values = selected_kpi.iloc[0]
+        event_column, delay_column, on_time_column = st.columns(3)
+        event_column.metric(
+            "Daily Events", f"{int(selected_values['total_events']):,}"
+        )
+        delay_column.metric(
+            "Avg Delay", f"{float(selected_values['avg_delay']):.1f} min"
+        )
+        on_time_column.metric(
+            "On-Time Rate", f"{float(selected_values['on_time_pct']):.1f}%"
+        )
 
     with station_kpi_area:
         st.metric("Stations Monitored", int(station_count["stations"].iloc[0]))
@@ -92,6 +97,7 @@ st.divider()
 
 # Delay trend over time (daily average)
 st.subheader("Daily Average Delay Trend")
+st.caption("All available dates")
 
 trend_query = """
     SELECT
