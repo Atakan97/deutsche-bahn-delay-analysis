@@ -3,8 +3,8 @@ name: ELT Pipeline (Airflow)
 on:
   workflow_dispatch:
   # Add a schedule after the first manual run succeeds
-  # schedule:
-  #   - cron: "7,22,37,52 * * * *"
+  schedule:
+  - cron: "7,22,37,52 * * * *"
 
 permissions:
   contents: read
